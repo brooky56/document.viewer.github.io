@@ -1,0 +1,334 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Document Viewer</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background-color: #fff;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            width: 60%;
+            max-width: 800px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        h2 {
+            font-size: 28px;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        input[type="text"] {
+            width: 80%;
+            padding: 12px;
+            margin: 20px 0;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+
+        button {
+            padding: 12px 25px;
+            background-color: #d10808;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+
+            button:hover {
+                background-color: #d12727;
+            }
+
+        .grid {
+            margin-top: 30px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+            width: 100%;
+            text-align: left;
+        }
+
+        .grid-row {
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            padding: 20px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: transform 0.3s ease;
+        }
+
+            .grid-row:hover {
+                transform: scale(1.02);
+            }
+
+        .grid-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .grid-details {
+            color: #777;
+            font-size: 16px;
+            margin-top: 5px;
+        }
+
+
+        .dropdown-content {
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f1f1f1;
+            border-radius: 6px;
+        }
+
+            .dropdown-content.active {
+                display: block;
+            }
+
+        /* Updated document-link styles */
+        .document-link {
+            display: block; /* Makes each link occupy full line, making it vertical */
+            color: #007bff;
+            text-decoration: none;
+            margin-bottom: 8px;
+            font-size: 16px;
+            position: relative;
+            padding-left: 20px; /* Space for arrow */
+        }
+
+            /* Add arrow using CSS pseudo-element */
+            .document-link::before {
+                content: '\2192'; /* Unicode for right arrow */
+                position: absolute;
+                left: 0;
+                color: #007bff;
+            }
+
+            .document-link:hover {
+                text-decoration: underline;
+            }
+
+        /* Add media queries for responsiveness */
+        @media only screen and (max-width: 768px) {
+            .container {
+                width: 90%;
+            }
+
+            .grid-row {
+                padding: 15px;
+            }
+
+            input[type="text"] {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header Section -->
+    <div class="container">
+        <h2>View Product Documents</h2>
+        <input type="text" id="productNumber" placeholder="Enter product number" />
+        <button onclick="displayGrid()">Search</button>
+
+        <div id="gridContainer" class="grid"></div>
+    </div>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script>
+
+        /**
+         * Скрывает спиннер
+         */
+        var hideSpinner = function () {
+            var spinnerDiv = window.top.document.getElementById("spinnerDiv");
+            if (spinnerDiv) {
+                spinnerDiv.parentNode.removeChild(spinnerDiv);
+            }
+        };
+
+        /**
+         * Показывает спиннер
+         * @param {any} text
+         */
+        var showSpinner = function (text) {
+            var w = window.innerWidth;
+            var h = window.innerHeight;
+            var spinnerDiv = window.top.document.createElement('div');
+            spinnerDiv.setAttribute('id', "spinnerDiv");
+            spinnerDiv.valign = "center";
+            spinnerDiv.align = "center";
+            var divInnerHtml = "<table height='100%' width='100%' style='cursor:wait'>";
+            divInnerHtml += "<tr>";
+            divInnerHtml += "<td vertical-align='middle' align='center'>";
+            divInnerHtml += "<img id='loading' alt='' src='progress.gif'/>";
+            divInnerHtml += "<div/><b>" + text + " ...</b>";
+            divInnerHtml += "</td></tr></table>";
+            spinnerDiv.innerHTML = divInnerHtml;
+            spinnerDiv.style.backgroundColor = '#1e1e1e1f';
+            spinnerDiv.style.fontSize = "15px";
+            spinnerDiv.style.zIndex = "1010";
+            spinnerDiv.style.width = w + 'px';
+            spinnerDiv.style.height = h + 'px';
+            spinnerDiv.style.position = 'absolute';
+            spinnerDiv.style.display = '';
+            window.top.document.body.insertBefore(spinnerDiv, window.top.document.body.firstChild);
+        };
+
+        function searchContainers() {
+            const productNumber = document.getElementById('productNumber').value;
+
+            var data = {
+                number: productNumber
+            };
+
+            return $.ajax({
+                type: "POST",
+                url: "https://prod-213.westeurope.logic.azure.com:443/workflows/b28c20b769ed4e5f8aa8bd26dc125dcb/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=nEfS2XhYM0d2OSXJxnEKMOYGxgNfrbQfB1l7naRC2vg",
+                processData: false,
+                contentType: 'application/json; charset=utf-8',
+                data: JSON.stringify(data)
+            });
+        }
+
+        function displayGrid() {
+
+            showSpinner("Getting data");
+            searchContainers().then(function (result) {
+
+                if (result.length != 0) {
+                    const gridContainer = document.getElementById('gridContainer');
+                    gridContainer.innerHTML = '';
+
+                    result.forEach(container => {
+
+                        const row = document.createElement('div');
+                        row.classList.add('grid-row');
+
+                        row.innerHTML = `
+                                                    <div class="grid-header">
+                                                        <span>Container: ${container.name} - ${container.icoId}</span>
+                                                        <span style="transform: rotate(90deg)" >></span>
+                                                    </div>
+                                                    <div class="grid-details">
+                                                        Order: ${container.orderName} | Volume: ${container.volume} | Country: ${container.country} | Exporter: ${container.exporter}
+                                                    </div>
+                                                    <div class="dropdown-content">
+                                                         ${container.documents.map(doc => `
+                                                            <a href="#" class="document-link" onclick="downloadDocument('${doc.link}','${doc.name}')">${doc.name}</a>`).join('')}
+                                                    </div>`;
+
+                        row.onclick = function () {
+                            const dropdown = row.querySelector('.dropdown-content');
+                            dropdown.classList.toggle('active');
+                        };
+
+
+                        gridContainer.appendChild(row);
+                    });
+                    hideSpinner();
+                }
+                else {
+                    console.log(result);
+                    hideSpinner();
+                }
+            }, function () {
+                console.log(result);
+                hideSpinner();
+            });
+        }
+
+        function downloadDocument(url, name) {
+            showSpinner("Downloading document");
+            // Call your API to retrieve the document from SharePoint.
+            console.log('Downloading document from:', url);
+            //download(url, "doc");
+            var data = {
+                link: url
+            };
+
+            $.ajax({
+                type: "POST",
+                url: "https://prod-22.westeurope.logic.azure.com:443/workflows/08ec3402225e4d968762ffdccde2171d/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=97qrR3sBppg23GMYGqkvMPj5dE0Us_uDQwtRLU964b4",
+                processData: false,
+                contentType: 'application/json; charset=utf-8',
+                data: JSON.stringify(data)
+            }).then(function (result) {
+
+                downloadFile("text", name, result);
+                hideSpinner();
+
+            }, function () {
+                console.log("Error");
+                hideSpinner();
+            });
+        }
+
+        /**
+         * Проверка на пустую строку
+         * @param {string} str Проверяемая строка
+         */
+        var isEmptyString = function (str) {
+            return (!str || typeof str !== "string"
+                || str === "" || str == "null");
+        };
+
+        /**
+         * Сохранить файл в загрузки
+         * @param {string} fileType Тип файла
+         * @param {string} fileName Имя файла
+         * @param {string} fileContent Содержимое файла в Base64
+         */
+        var downloadFile = function (fileType, fileName, fileContent) {
+            if (isEmptyString(fileType) || isEmptyString(fileContent)) {
+                return;
+            }
+            if (isEmptyString(fileName)) {
+                fileName = "document." + fileType.split("/")[1];
+            }
+            var a = document.createElement("a");
+            a.href = "data:" + fileType + ";base64," + fileContent;
+            a.download = fileName;
+            debugger;
+            a.click();
+        };
+
+        var saveBlob = (function () {
+            var a = document.createElement("a");
+            document.body.appendChild(a);
+            a.style = "display: none";
+            return function (blob, fileName) {
+                var url = window.URL.createObjectURL(blob);
+                a.href = url;
+                a.download = fileName;
+                a.click();
+                window.URL.revokeObjectURL(url);
+            };
+        }());
+
+    </script>
+</body>
+</html>
